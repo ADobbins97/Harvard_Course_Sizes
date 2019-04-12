@@ -1,0 +1,101 @@
+---
+title: "Dobbins_ps_3"
+author: "Alexandra Dobbins"
+date: "2/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Load necessary packages
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(knitr)
+library(dplyr)
+library(lubridate)
+library(ggridges)
+library(viridis)
+
+```
+
+```{r, echo = FALSE}
+#Create new variable with bad data removed and clean labels to ease future manipulations
+  #remove top 3 rows so that the column anmes are at the top
+x <- read_xlsx("enrollment_copy.xlsx", skip = 3) %>% 
+  #clean up names of columns so they can be used as variables
+  clean_names() %>% 
+  #remove rows with course_section_code of NA 
+  filter(! is.na(course_section_code)) %>% 
+  #remove columns with less than 5 undergraduates or a non-majority of undergraduates
+  filter(u_grad > 5, u_grad > (total - u_grad))
+
+#Find the course with the 9th most undergraduates in it
+max_ugrad <- x %>% 
+  #group data by course_name
+  group_by(course_name) %>% 
+  #arrange rows in descending order by number of undergraduates
+  arrange(desc(u_grad))
+#create new varaible which selects the 9th highest course_name from max_ugrad 
+max <- max_ugrad$course_name[9]
+  
+#Find the department with the 6th most undergrads in it
+sixth_high_ugrad <- x %>% 
+  group_by(course_department) %>% 
+  #sum the undergraduates from all courses per department
+  summarize(sum = sum(u_grad)) %>% 
+  #arrange the data in descending order by number of summed undergraduates
+  arrange(desc(sum))
+#create new varaible which pulls the 6th highest course_department from the sixth_high_ugrad dataset
+sixth <- sixth_high_ugrad$course_department[6]  
+
+#Find the number of undergraduates in all Economics courses
+econ <- x %>% 
+  #select only columns course_department and u_grad
+  select(course_department, u_grad) %>% 
+  #filter out all but the Economics columns
+  filter(course_department == "Economics") %>% 
+  #sum for the total undergraduates in all of these courses
+  summarize(sum(u_grad))
+  
+```
+
+Question 1:
+
+- The total number of courses is `r count(x)`
+- The course name with the 9th highest undergraduate enrollment is `r max`
+- The department with the 6th highest total undergraduate enrollment is `r sixth`
+- Economics has a total undergraduate enrollment of `r econ`
+
+Question 2:
+
+```{r, echo = FALSE, message = FALSE}
+
+#Working off of previously cleaned and filtered dataset 'x'
+x %>% 
+#select only for columns which will be needed to make plot
+select(course_department, u_grad, course_name) %>% 
+  #filter so only the departments we are interested are included in the data 
+  filter(course_department %in% c("Statistics", "Mathematics", "Government", "Expository Writing", "Economics", "Computer Science")) %>% 
+  #create plot of number of u_grads versus department
+  ggplot(aes(x = u_grad, y = course_department))+
+  #make the plot type density  
+  geom_density_ridges_gradient(aes(fill = ..x..))+
+  #set color scheme of plot
+  scale_fill_viridis(name = "Temp [F]", option = "C")+
+  
+  
+  labs(title = "Course Enrollments Spring 2019",
+       subtitle = "Departments vary in their typical class sizes",
+       caption = "Source : Harvard Registrar")+
+  #remove legend from plot
+  theme(legend.position = "none")+
+  #label x axis
+  xlab("Class Size")+
+  #remove y axis label
+  ylab(NULL)+
+  #scale x axis logarithmicly so lables read "10", "100", "1000" 
+  scale_x_log10()
+
+```
